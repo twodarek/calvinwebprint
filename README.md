@@ -96,7 +96,7 @@ Like activating the virtual environment, you will have to run this command in ea
 
 #### Using Nose to run tests
     
-Run the tests with from the root directory of the repo:
+To run the tests with from the root directory of the repo:
 
     nosetests
 
