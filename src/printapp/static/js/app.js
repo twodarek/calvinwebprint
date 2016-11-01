@@ -140,10 +140,36 @@ App.SignInController = Ember.Controller.extend({
 });
 
 App.QueueController = Ember.ArrayController.extend({
-  itemController: 'queueItem'
+  needs: ['application','queue'],
+  itemController: 'queueItem',
+
+  actions : {
+
+    deleteJob: function(job_id) {
+      $("#" + job_id + " .loading-spinner").css("display", "inline-block");
+      $("#" + job_id + " a").hide();
+      var controller = this;
+
+      $.post('/api/deletejob/' + job_id)
+      .done(function(data, textStatus, response) {
+        var queue = controller.get('model');
+        var documentToDelete = queue.findBy('job_id', job_id);
+        controller.get('model').removeObject(documentToDelete);
+        controller.get('controllers.application').getQueueAndBudget();
+      }).error(function(data, textStatus, response) {
+        App.util.showAlert('#deleteError');
+        $("#" + job_id + " a").show();
+      }).always(function(data, textStatus, response) {
+        $("#" + job_id + " .loading-spinner").hide();
+      });
+    }
+
+  }
 });
 
 App.QueueItemController = Ember.ObjectController.extend({
+  loading: false, 
+
   displayIsColor: function() {
     return this.get('color') ? 'Yes' : 'No';
   }.property('color'),
@@ -162,6 +188,8 @@ App.QueueItemController = Ember.ObjectController.extend({
 });
 
 App.CloudprintController = Ember.ObjectController.extend({
+  needs: 'application',
+
   init: function() {
     this._super();
     this.getCloudPrintStatus();
@@ -172,7 +200,6 @@ App.CloudprintController = Ember.ObjectController.extend({
   cloudPrintPermissionUrl: null,
   loadingError: false,
 
-  addPrinterLink: 'http://www.calvin.edu/go/addcloudprint',
   showAddPrinterHelp: false,
   showAddPrinterButton: true,
 
@@ -214,13 +241,17 @@ App.CloudprintController = Ember.ObjectController.extend({
   actions: {
 
     onAddPrinter: function() {
+      var controller = this;
+
       // open a url in a new window where users can add the Calvin printer
       // to their cloud print account.
-      window.open(this.get('addPrinterLink', '_blank'));
+      var email = encodeURIComponent(controller.get('controllers.application.email'));
+      var UNIFLOW_ID = '744d93a2-bc96-3bb5-7bac-4042a5cfb08a';
+      var addPrinterLink = 'https://accounts.google.com/AddSession?continue=https%3A%2F%2Fwww.google.com%2Fcloudprint%2Faddpublicprinter.html%3Fprinterid%3D' + UNIFLOW_ID + '%26key%3D254955605&service=cloudprint&sacu=1&acui=2#Email=' + email;
+      window.open(addPrinterLink, '_blank');
       this.set('showAddPrinterButton', false);
 
       // when focus returns to this page, check if the printer was added
-      var controller = this;
       window.addEventListener('focus', function(event) {
         controller.checkIfPrinterAdded();
         event.target.removeEventListener(event.type, arguments.callee);
@@ -299,7 +330,7 @@ App.PrintFormController = Ember.ObjectController.extend({
 
   actions: {
     selectFile: function() {
-      $('#fileSizeError, #fileTypeError').hide();
+      $('#fileSizeError, #fileTypeError, #fileUploadError').hide();
       var element = document.getElementById('file-input');
       element.click();
     },
@@ -337,6 +368,7 @@ App.PrintFormController = Ember.ObjectController.extend({
         controller.set('documentId', data.file_id);
       })
       .fail(function(data, textStatus, response) {
+        App.util.showAlert('#fileUploadError');
         controller.send('cancelUpload');
       });
     },
